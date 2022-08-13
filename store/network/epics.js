@@ -1,10 +1,10 @@
-import { switchMap, map, filter, tap } from "rxjs/operators";
-import { from } from "rxjs";
-import { changeNetwork, changeNetworkFullfilled } from "./";
-import { INFURA_PROJECT_ID } from "../../constants/infura";
-import { ethers } from "ethers";
-import { FAUCET_PUBLIC_ADDRESS } from "../../constants/faucet";
-import { refreshFaucetBalance } from "./";
+import { ethers } from 'ethers';
+import { EMPTY, from } from 'rxjs';
+import { catchError, filter, map, switchMap } from 'rxjs/operators';
+
+import { FAUCET_PUBLIC_ADDRESS } from '../../constants/faucet';
+import { INFURA_PROJECT_ID } from '../../constants/infura';
+import { changeNetwork, changeNetworkFullfilled, refreshFaucetBalance } from './';
 
 export const getFaucetBalanceEpic = (actions$) =>
   actions$.pipe(
@@ -14,6 +14,9 @@ export const getFaucetBalanceEpic = (actions$) =>
       return from(provider.getBalance(FAUCET_PUBLIC_ADDRESS)).pipe(
         map((balanceBigNumber) => {
           return changeNetworkFullfilled(parseFloat(ethers.utils.formatEther(balanceBigNumber)));
+        }),
+        catchError((error) => {
+          return EMPTY;
         })
       );
     })

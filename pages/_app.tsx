@@ -1,17 +1,21 @@
-import Head from "next/head";
-import CssBaseline from "@mui/material/CssBaseline";
-import { ThemeProvider } from "@mui/material/styles";
-import { darkTheme } from "../utils/createTheme";
-import createEmotionCache from "../utils/createEmotionCache";
-import { CacheProvider } from "@emotion/react";
-import { store } from "../store";
-import { Provider } from "react-redux";
-import { ethers } from "ethers";
-import { Web3ReactProvider } from "@web3-react/core";
-import { AppProps } from "next/app";
-import { EmotionCache } from "@emotion/utils";
+import { CacheProvider } from '@emotion/react';
+import { EmotionCache } from '@emotion/utils';
+import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider } from '@mui/material/styles';
+import { Web3ReactProvider } from '@web3-react/core';
+import { ethers } from 'ethers';
+import { AppProps } from 'next/app';
+import dynamic from 'next/dynamic';
+import Head from 'next/head';
+import { Provider } from 'react-redux';
+
+import { store } from '../store';
+import createEmotionCache from '../utils/createEmotionCache';
+import { darkTheme } from '../utils/createTheme';
 
 const clientSideEmotionCache = createEmotionCache();
+
+const Web3ReactProviderDefault = dynamic(() => import("../components/Web3providerWithNoSSR"), { ssr: false });
 
 const getLibrary = (provider: any) => {
   const library = new ethers.providers.Web3Provider(provider);
@@ -34,7 +38,9 @@ function MyApp({ Component, pageProps, emotionCache = clientSideEmotionCache }: 
         <CssBaseline />
         <Provider store={store}>
           <Web3ReactProvider getLibrary={getLibrary}>
-            <Component {...pageProps} />
+            <Web3ReactProviderDefault getLibrary={getLibrary}>
+              <Component {...pageProps} />
+            </Web3ReactProviderDefault>
           </Web3ReactProvider>
         </Provider>
       </ThemeProvider>

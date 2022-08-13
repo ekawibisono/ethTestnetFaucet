@@ -1,17 +1,19 @@
-import { ChangeEvent, SyntheticEvent, useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { Alert, Backdrop, FormHelperText, TextField, Box, Button, CircularProgress } from "@mui/material";
-import { useWeb3React } from "@web3-react/core";
-import { ethers } from "ethers";
+import { Alert, Backdrop, Box, Button, CircularProgress, FormHelperText, TextField } from '@mui/material';
+import { useWeb3React } from '@web3-react/core';
+import { ChangeEvent, SyntheticEvent, useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
-import { requestfundsFromFaucet } from "../../store/receiveForm";
-import { selectIsLoading } from "../../store/receiveForm/selectors";
-import { MAXIMUM_AMOUNT_ALLOWED_PER_TX } from "../../constants/faucet";
-import { hideSnackbar, selectSnackbarState, showSnackbar } from "../../store/snackbar";
-import StatusSnackbar from "./StatusSnackbar";
+import { MAXIMUM_AMOUNT_ALLOWED_PER_TX } from '../../constants/faucet';
+import useENS from '../../hooks/useENS';
+import { requestfundsFromFaucet } from '../../store/receiveForm';
+import { selectIsLoading } from '../../store/receiveForm/selectors';
+import { hideSnackbar, selectSnackbarState, showSnackbar } from '../../store/snackbar';
+import { validate } from '../../utils/ethereumAddress';
+import StatusSnackbar from './StatusSnackbar';
 
 const ReceiveForm = () => {
   const { account } = useWeb3React();
+  const { ensName, resolveNameToAddress } = useENS(account ?? "");
   const [amount, setAmount] = useState(0.001);
   const [address, setAddress] = useState("");
   const [invalidEthAddress, setInvalidEthAddress] = useState(false);
@@ -25,7 +27,7 @@ const ReceiveForm = () => {
     const invalidAmountValue = !newValue || +newValue <= 0;
     if (invalidAmountValue) return;
 
-    const overMaximumAllowed = +newValue >= MAXIMUM_AMOUNT_ALLOWED_PER_TX;
+    const overMaximumAllowed = +newValue > MAXIMUM_AMOUNT_ALLOWED_PER_TX;
     overMaximumAllowed ? setAmount(MAXIMUM_AMOUNT_ALLOWED_PER_TX) : setAmount(+newValue);
   };
 
@@ -33,24 +35,36 @@ const ReceiveForm = () => {
     dispatch(hideSnackbar());
   };
 
-  const handleSubmit = (event: SyntheticEvent) => {
+  const handleSubmit = async (event: SyntheticEvent) => {
     event.preventDefault();
     setInvalidEthAddress(false);
 
-    const validEthereumAddress = ethers.utils.isAddress(address);
-    if (!validEthereumAddress) {
+    const result = validate(address);
+    if (!result.isOk) {
       setInvalidEthAddress(true);
       return;
     }
 
+    let ensResolvedAddress;
+    if (result.addressType === "ENS") {
+      ensResolvedAddress = await resolveNameToAddress(address);
+    }
+
+    dispatch(requestfundsFromFaucet({ amount, address: ensResolvedAddress ?? address }));
+
     const SigningTxAlert = <Alert severity="info">Signing transaction...</Alert>;
     dispatch(showSnackbar({ show: true, target: "receiveForm", content: SigningTxAlert }));
-    dispatch(requestfundsFromFaucet({ amount, address }));
   };
 
   useEffect(() => {
-    account ? setAddress(account) : setAddress("");
-  }, [account]);
+    if (ensName) {
+      setAddress(ensName);
+    } else if (account) {
+      setAddress(account);
+    } else {
+      setAddress("");
+    }
+  }, [account, ensName]);
 
   return (
     <>
@@ -74,7 +88,7 @@ const ReceiveForm = () => {
             name="address"
             error={invalidEthAddress}
             fullWidth
-            label="Your Address"
+            label="Your Address (or ENS)"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             variant="outlined"
